@@ -5,7 +5,7 @@
 #### Стек
 1. Операционная система: [`Linux`](https://ubuntu.com/download/desktop), [`Docker`](https://docs.docker.com/get-started/get-docker/)
 2. СУБД: [`PostgreSQL`](https://www.postgresql.org/download/) , [`postgrest`](https://docs.postgrest.org/en/v12/)
-
+3. Front: `JavaScript`, `Jquery`, `Html`
 
 ## Легенда
 > Вы включены в команду целью которой состоит в разработке базы данных и **Backend** для системы подготовки метрологических данных в рамках разработки ПАК (Программно-аппаратного комплекса) согласно **Технического задания**.<br><br>
