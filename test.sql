@@ -59,30 +59,31 @@ values(1, 100,12,34,0.2,45);
 -- Таблица с историей
 create table measurment_baths
 (
-    id integer primary key not null,
-    employee_id integer not null REFERENCES employees(id),
-    measurment_input_param_id integer not null REFERENCES measurment_input_params(id),
-    started timestamp default now()
+  id integer primary key not null,
+  employee_id integer not null REFERENCES employees(id),
+  measurment_input_param_id integer not null REFERENCES measurment_input_params(id),
+  started timestamp default now()
 );
 create sequence measurment_baths_seq;
 alter table measurment_baths alter column id set default nextval('measurment_baths_seq');
 insert into measurment_baths(employee_id, measurment_input_param_id)
 values(1, 1);
-CREATE TABLE temperature_corrections
-(
-id integer PRIMARY key not null,
-temperature numeric,
-correction numeric
-);
-CREATE SEQUENCE temperature_correction_seq;
-alter table temperature_corrections alter COLUMN id set default nextval('temperature_correction_seq');
-INSERT into temperature_corrections(temperature, correction)
-values(0, 0),(5,0.5),(10, 1),(15, 1),(20, 1.5),(25, 2),(30, 3.5),(40, 4.5);
 
 END;
 
 
 BEGIN
+
+CREATE TABLE temperature_corrections
+(
+  id integer PRIMARY key not null,
+  temperature numeric,
+  correction numeric
+);
+CREATE SEQUENCE temperature_correction_seq;
+alter table temperature_corrections alter COLUMN id set default nextval('temperature_correction_seq');
+INSERT into temperature_corrections(temperature, correction)
+values(0, 0),(5,0.5),(10, 1),(15, 1),(20, 1.5),(25, 2),(30, 3.5),(40, 4.5);
 
 CREATE TYPE interpolation as (t1 numeric, t2 numeric, c1 numeric, c2 numeric, temperature numeric);
 
