@@ -69,6 +69,7 @@ alter table measurment_baths alter column id set default nextval('measurment_bat
 insert into measurment_baths(employee_id, measurment_input_param_id)
 values(1, 1);
 
+commit;
 END;
 
 
@@ -109,17 +110,18 @@ LANGUAGE plpgsql as $func$
 DECLARE 
 	correction NUMERIC;
 BEGIN
-	Select interpol.с1+((interpol.temperature-interpol.t1)/(interpol.t2-interpol.t1))*(interpol.c2-interpol.c1)
+	Select interpol.c1+((interpol.temperature-interpol.t1)/(interpol.t2-interpol.t1))*(interpol.c2-interpol.c1)
 	INTO correction;
 
 	RETURN correction;
 END;
 $func$;
 
+commit;
 END;
 
 
 end$$;
 
 
-select interpolation2corrections(get_interpolation(22));
+--select interpolation2corrections(get_interpolation(22));
