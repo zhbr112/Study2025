@@ -82,4 +82,43 @@ values(0, 0),(5,0.5),(10, 1),(15, 1),(20, 1.5),(25, 2),(30, 3.5),(40, 4.5);
 END;
 
 
+BEGIN
+
+CREATE TYPE interpolation as (t1 numeric, t2 numeric, c1 numeric, c2 numeric, temperature numeric);
+
+CREATE FUNCTION get_interpolation(temp1 numeric) 
+RETURNS interpolation 
+LANGUAGE plpgsql as $func$ 
+DECLARE 
+	interpolat interpolation;
+BEGIN
+	Select t1,t2,c1,c2,temp1 as interpolation into interpolat from 
+	(SELECT temperature as t1, correction as c1  from temperature_corrections where temperature<=temp1 order by temperature DESC limit 1)
+	full join
+	(SELECT temperature as t2, correction as c2 from temperature_corrections where temperature>=temp1 order by temperature limit 1)
+	on true limit 1;
+
+	RETURN interpolat;
+END;
+$func$;
+
+CREATE FUNCTION interpolation2corrections(interpol interpolation) 
+RETURNS NUMERIC
+LANGUAGE plpgsql as $func$
+DECLARE 
+	correction NUMERIC;
+BEGIN
+	Select ((interpol.c2-interpol.c1)*interpol.temperature)/(interpol.t2-interpol.t1)
+	INTO correction;
+
+	RETURN correction;
+END;
+$func$;
+
+END;
+
+
 end$$;
+
+
+select interpolation2corrections(get_interpolation(22));
