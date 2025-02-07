@@ -109,7 +109,7 @@ LANGUAGE plpgsql as $func$
 DECLARE 
 	correction NUMERIC;
 BEGIN
-	Select ((interpol.c2-interpol.c1)*interpol.temperature)/(interpol.t2-interpol.t1)
+	Select interpol.с1+((interpol.temperature-interpol.t1)/(interpol.t2-interpol.t1))*(interpol.c2-interpol.c1)
 	INTO correction;
 
 	RETURN correction;
