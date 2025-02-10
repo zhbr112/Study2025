@@ -1,6 +1,9 @@
 DO $$
 begin
 
+IF EXISTS(select from pg_catalog.pg_tables where tablename = 'military_ranks') THEN
+RAISE NOTICE 'Table exists.';
+ELSE
 
 begin
 
@@ -110,8 +113,14 @@ LANGUAGE plpgsql as $func$
 DECLARE 
 	correction NUMERIC;
 BEGIN
+	if interpol.t1 = interpol.temperature OR interpol.t2 is null  THEN
+	Select interpol.c1 INTO correction;
+	elseif interpol.t2 = interpol.temperature OR interpol.t1 is null THEN
+	Select interpol.c2 INTO correction;
+	else
 	Select interpol.c1+((interpol.temperature-interpol.t1)/(interpol.t2-interpol.t1))*(interpol.c2-interpol.c1)
 	INTO correction;
+	end if;
 
 	RETURN correction;
 END;
@@ -120,6 +129,7 @@ $func$;
 commit;
 END;
 
+END IF;
 
 end$$;
 
