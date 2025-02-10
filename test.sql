@@ -113,7 +113,9 @@ LANGUAGE plpgsql as $func$
 DECLARE 
 	correction NUMERIC;
 BEGIN
-	if interpol.t1 = interpol.temperature OR interpol.t2 is null  THEN
+  if (interpol.t2-interpol.t1)=0 then
+  Select 0 INTO correction;
+	elseif interpol.t1 = interpol.temperature OR interpol.t2 is null  THEN
 	Select interpol.c1 INTO correction;
 	elseif interpol.t2 = interpol.temperature OR interpol.t1 is null THEN
 	Select interpol.c2 INTO correction;
