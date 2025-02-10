@@ -1,6 +1,9 @@
 DO $$
 begin
 
+IF EXISTS(select from pg_catalog.pg_tables where tablename = 'military_ranks') THEN
+RAISE NOTICE 'Table exists.';
+ELSE
 
 begin
 
@@ -59,27 +62,78 @@ values(1, 100,12,34,0.2,45);
 -- Таблица с историей
 create table measurment_baths
 (
-    id integer primary key not null,
-    employee_id integer not null REFERENCES employees(id),
-    measurment_input_param_id integer not null REFERENCES measurment_input_params(id),
-    started timestamp default now()
+  id integer primary key not null,
+  employee_id integer not null REFERENCES employees(id),
+  measurment_input_param_id integer not null REFERENCES measurment_input_params(id),
+  started timestamp default now()
 );
 create sequence measurment_baths_seq;
 alter table measurment_baths alter column id set default nextval('measurment_baths_seq');
 insert into measurment_baths(employee_id, measurment_input_param_id)
 values(1, 1);
+
+commit;
+END;
+
+
+BEGIN
+
 CREATE TABLE temperature_corrections
 (
-id integer PRIMARY key not null,
-temperature numeric,
-correction numeric
+  id integer PRIMARY key not null,
+  temperature numeric,
+  correction numeric
 );
 CREATE SEQUENCE temperature_correction_seq;
 alter table temperature_corrections alter COLUMN id set default nextval('temperature_correction_seq');
 INSERT into temperature_corrections(temperature, correction)
 values(0, 0),(5,0.5),(10, 1),(15, 1),(20, 1.5),(25, 2),(30, 3.5),(40, 4.5);
 
+CREATE TYPE interpolation as (t1 numeric, t2 numeric, c1 numeric, c2 numeric, temperature numeric);
+
+CREATE FUNCTION get_interpolation(temp1 numeric) 
+RETURNS interpolation 
+LANGUAGE plpgsql as $func$ 
+DECLARE 
+	interpolat interpolation;
+BEGIN
+	Select t1,t2,c1,c2,temp1 as interpolation into interpolat from 
+	(SELECT temperature as t1, correction as c1  from temperature_corrections where temperature<=temp1 order by temperature DESC limit 1)
+	full join
+	(SELECT temperature as t2, correction as c2 from temperature_corrections where temperature>=temp1 order by temperature limit 1)
+	on true limit 1;
+
+	RETURN interpolat;
+END;
+$func$;
+
+CREATE FUNCTION interpolation2corrections(interpol interpolation) 
+RETURNS NUMERIC
+LANGUAGE plpgsql as $func$
+DECLARE 
+	correction NUMERIC;
+BEGIN
+  if (interpol.t2-interpol.t1)=0 then
+  Select 0 INTO correction;
+	elseif interpol.t1 = interpol.temperature OR interpol.t2 is null  THEN
+	Select interpol.c1 INTO correction;
+	elseif interpol.t2 = interpol.temperature OR interpol.t1 is null THEN
+	Select interpol.c2 INTO correction;
+	else
+	Select interpol.c1+((interpol.temperature-interpol.t1)/(interpol.t2-interpol.t1))*(interpol.c2-interpol.c1)
+	INTO correction;
+	end if;
+
+	RETURN correction;
+END;
+$func$;
+
+commit;
 END;
 
+END IF;
 
 end$$;
+
+
+--select interpolation2corrections(get_interpolation(22));
