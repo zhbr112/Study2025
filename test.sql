@@ -756,9 +756,9 @@ begin
 				var_measure_input_data_id,
 				fn_get_random_timestamp('2025-02-01 00:00', '2025-02-05 00:00')
 			;	
-		end loop;
+end loop;
 	
-	end loop;
+end loop;
 
 raise notice 'Набор тестовых данных сформирован успешно';
 
@@ -1010,4 +1010,4 @@ join measurment_baths as t2 on t2.measurment_input_param_id = t1.id
 join employees as t3 on t3.id = t2.emploee_id
 join military_ranks as t4 on t4.id = t3.military_rank_id
 group by t3.name, t4.description
-order by count(case when corect=FALSE then 1 else null end);
+order by count(case when corect=FALSE then 1 else null end) DESC;
