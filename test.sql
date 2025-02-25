@@ -38,6 +38,7 @@ begin
 	drop table if exists public.measurment_types;
 	drop table if exists public.military_ranks;
 	drop table if exists public.measurment_settings;
+	drop table if exists average_deviations_temperatur;
 
 	-- Нумераторы
 	drop sequence if exists public.measurment_input_params_seq;
@@ -157,7 +158,9 @@ values('min_temperature', '-10', 'Минимальное значение тем
 ('calc_table_temperature','15.9','Табличное значение температуры'),
 ('calc_table_pressure','750','Табличное значение наземного давления'),
 ('min_height','0','Минимальная высота'),
-('max_height','400','Максимальная высота');
+('max_height','400','Максимальная высота'),
+('ground_temperature_deviation', '15.9', 'Отклонение приземной виртуальной температуры'),
+('delta_tv', '0.3', 'Измеренная приземная температура воздуха');
 
 
 raise notice 'Создание общих справочников и наполнение выполнено успешно'; 
@@ -757,6 +760,254 @@ begin
 	
 	end loop;
 
-	raise notice 'Набор тестовых данных сформирован успешно';
+raise notice 'Набор тестовых данных сформирован успешно';
+
+-- Функция для проверки входных параметров возвращающая true или false
+create or REPLACE function public.fn_check_input_params_bool(
+	par_height numeric(8,2),
+	par_temperature numeric(8,2),
+	par_pressure numeric(8,2),
+	par_wind_direction numeric(8,2),
+	par_wind_speed numeric(8,2),
+	par_bullet_demolition_range numeric(8,2)
+)
+returns BOOLEAN
+language 'plpgsql'
+as $body$
+declare
+	var_result public.input_params;
+begin
+
+	
+	-- Температура
+	if not exists (
+		select 1 from (
+				select 
+						coalesce(min_temperature , '0')::numeric(8,2) as min_temperature, 
+						coalesce(max_temperature, '0')::numeric(8,2) as max_temperature
+				from 
+				(select 1 ) as t
+					cross join
+					( select value as  min_temperature from public.measurment_settings where key = 'min_temperature' ) as t1
+					cross join 
+					( select value as  max_temperature from public.measurment_settings where key = 'max_temperature' ) as t2
+				) as t	
+			where
+				par_temperature between min_temperature and max_temperature
+			) then
+
+			return FALSE;
+	end if;
+
+	var_result.temperature = par_temperature;
+
+	
+	-- Давление
+	if not exists (
+		select 1 from (
+			select 
+					coalesce(min_pressure , '0')::numeric(8,2) as min_pressure, 
+					coalesce(max_pressure, '0')::numeric(8,2) as max_pressure
+			from 
+			(select 1 ) as t
+				cross join
+				( select value as  min_pressure from public.measurment_settings where key = 'min_pressure' ) as t1
+				cross join 
+				( select value as  max_pressure from public.measurment_settings where key = 'max_pressure' ) as t2
+			) as t	
+			where
+				par_pressure between min_pressure and max_pressure
+				) then
+
+			return FALSE;
+	end if;
+
+	var_result.pressure = par_pressure;			
+
+		-- Высота
+		if not exists (
+			select 1 from (
+				select 
+						coalesce(min_height , '0')::numeric(8,2) as min_height, 
+						coalesce(max_height, '0')::numeric(8,2) as  max_height
+				from 
+				(select 1 ) as t
+					cross join
+					( select value as  min_height from public.measurment_settings where key = 'min_height' ) as t1
+					cross join 
+					( select value as  max_height from public.measurment_settings where key = 'max_height' ) as t2
+				) as t	
+				where
+				par_height between min_height and max_height
+				) then
+	
+				return FALSE;
+		end if;
+
+		var_result.height = par_height;
+		
+		-- Напрвление ветра
+		if not exists (
+			select 1 from (	
+				select 
+						coalesce(min_wind_direction , '0')::numeric(8,2) as min_wind_direction, 
+						coalesce(max_wind_direction, '0')::numeric(8,2) as max_wind_direction
+				from 
+				(select 1 ) as t
+					cross join
+					( select value as  min_wind_direction from public.measurment_settings where key = 'min_wind_direction' ) as t1
+					cross join 
+					( select value as  max_wind_direction from public.measurment_settings where key = 'max_wind_direction' ) as t2
+			)
+				where
+				par_wind_direction between min_wind_direction and max_wind_direction
+			) then
+
+			return FALSE;
+	end if;			
+
+	return TRUE;
+	
+end;
+$body$;
+	
+-- Таблица для расчета среднего
+CREATE TABLE average_deviations_temperatur (
+    height INT PRIMARY KEY, -- Высота
+    negative_values NUMERIC[], -- Массив для отрицательных значений
+    positive_values NUMERIC[]  -- Массив для положительных значений
+);
+
+-- Вставка данных
+INSERT INTO average_deviations_temperatur (height, negative_values, positive_values)
+VALUES 
+(
+    200,
+    ARRAY[-1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -20, -30, -40, -50],
+    ARRAY[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, NULL, NULL]
+),
+(
+    400,
+    ARRAY[-1, -2, -3, -4, -5, -6, -6, -7, -8, -9, -19, -29, -38, -48],
+    ARRAY[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, NULL, NULL]
+),
+(
+    800,
+    ARRAY[-1, -2, -3, -4, -5, -6, -6, -7, -7, -8, -18, -28, -37, -46],
+    ARRAY[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, NULL, NULL]
+),
+(
+    1200,
+    ARRAY[-1, -2, -3, -4, -4, -5, -5, -6, -7, -8, -17, -26, -35, -44],
+    ARRAY[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, NULL, NULL]
+),
+(
+    1600,
+    ARRAY[-1, -2, -3, -3, -4, -4, -5, -6, -7, -7, -17, -25, -34, -42],
+    ARRAY[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, NULL, NULL]
+),
+(
+    2000,
+    ARRAY[-1, -2, -3, -3, -4, -4, -5, -6, -6, -7, -16, -24, -32, -40],
+    ARRAY[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, NULL, NULL]
+),
+(
+    2400,
+    ARRAY[-1, -2, -2, -3, -4, -4, -5, -5, -6, -7, -15, -23, -31, -38],
+    ARRAY[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, NULL, NULL]
+),
+(
+    3000,
+    ARRAY[-1, -2, -2, -3, -4, -4, -4, -5, -5, -6, -15, -22, -30, -37],
+    ARRAY[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, NULL, NULL]
+),
+(
+    4000,
+    ARRAY[-1, -2, -2, -3, -4, -4, -4, -4, -5, -6, -14, -20, -27, -34],
+    ARRAY[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, NULL, NULL]
+);
+
+-- Функция для расчета среднего отклонения
+CREATE OR REPLACE FUNCTION calculate_average_deviation(temperature NUMERIC)
+RETURNS TABLE(height INT, deviation NUMERIC) AS $body$
+DECLARE
+    t0 NUMERIC;
+    delta_t NUMERIC;
+    deviation_value NUMERIC;
+    deviation_ten NUMERIC;
+    deviation_unit NUMERIC;
+    row_data RECORD;
+    ground_temp_deviation NUMERIC;
+    delta_tv NUMERIC;
+BEGIN
+	SELECT value::NUMERIC INTO delta_tv
+    FROM measurment_settings
+    WHERE key = 'delta_tv';
+
+	IF COALESCE(delta_tv, 0) = 0 THEN
+   		RAISE EXCEPTION 'Нет константы delta_tv';
+	END IF;
+	
+    SELECT value::NUMERIC INTO ground_temp_deviation
+    FROM measurment_settings
+    WHERE key = 'ground_temperature_deviation';
+	
+	IF COALESCE(ground_temp_deviation, 0) = 0 THEN
+   		RAISE EXCEPTION 'Нет константы ground_temp_deviation';
+	END IF;
+
+    t0 := temperature + delta_tv;
+
+    delta_t := ROUND(t0 - ground_temp_deviation);
+
+    FOR row_data IN SELECT * FROM average_deviations_temperatur LOOP
+		deviation_unit := ABS(delta_t) % 10;
+        deviation_ten := (ABS(delta_t) / 10) * 10;
+        
+        IF delta_t < 0 THEN
+            deviation_value := row_data.negative_values[deviation_ten / 10 + 1] + row_data.negative_values[deviation_unit + 1];
+        ELSE
+            deviation_value := row_data.positive_values[deviation_ten / 10 + 1] + row_data.positive_values[deviation_unit + 1];
+        END IF;
+
+        height := row_data.height;
+        deviation := deviation_value;
+        RETURN NEXT;
+    END LOOP;
+END;
+$body$ LANGUAGE plpgsql;
+
+-- Примеры использования функции
+DO $body$
+DECLARE
+    temp NUMERIC;
+    height INT;
+    deviation NUMERIC;
+BEGIN
+    temp := 15;
+    RAISE NOTICE 'Температура: %', temp;
+    FOR height, deviation IN 
+        SELECT * FROM calculate_average_deviation(temp)
+    LOOP
+        RAISE NOTICE 'Высота: %, Отклонение: %', height, deviation;
+    END LOOP;
+
+    temp := -40;
+    RAISE NOTICE 'Температура: %', temp;
+    FOR height, deviation IN 
+        SELECT * FROM calculate_average_deviation(temp)
+    LOOP
+        RAISE NOTICE 'Высота: %, Отклонение: %', height, deviation;
+    END LOOP;
+END $body$;
 	
 end $$;
+
+select t3.name, t4.description, count(*)as count, count(case when corect=FALSE then 1 else null end) as not_correct from
+(SELECT *, public.fn_check_input_params_bool(q1.height, q1.temperature, q1.pressure, q1.wind_direction, q1.wind_speed, q1.bullet_demolition_range) as corect 
+from public.measurment_input_params as q1) as t1
+join measurment_baths as t2 on t2.measurment_input_param_id = t1.id
+join employees as t3 on t3.id = t2.emploee_id
+join military_ranks as t4 on t4.id = t3.military_rank_id
+group by t3.name, t4.description
+order by count(case when corect=FALSE then 1 else null end);
